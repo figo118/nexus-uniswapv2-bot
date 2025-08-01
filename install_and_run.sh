@@ -119,7 +119,7 @@ except:
             echo -e "${RED}无效私钥! 请检查:${RESET}"
             echo "1. 必须是64字符十六进制"
             echo "2. 不要包含空格"
-            echo "3. 示例: ba4d39b425e17d1c2f78f2a1c0bdaf36c4cf277894801eeec5469169d8261471"
+            echo "3. 示例: bx4d39b425e17d1c2f78f2a1c0bdaf66c4cf277894801eeec5469169d8261451"
         fi
     done
 }
