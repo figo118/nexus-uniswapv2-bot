@@ -11,7 +11,7 @@ RESET='\033[0m'
 REPO_URL="https://github.com/figo118/nexus-uniswapv2-bot.git"
 REPO_NAME="nexus-uniswapv2-bot"
 CONFIG_BACKUP="$HOME/.nexus_bot_backup.env"
-VENV_DIR="$HOME/nexus-bot-venv"
+VENV_DIR="$HOME/nexus-bot-venv"  # 修复：使用绝对路径
 
 # 获取脚本目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -42,25 +42,24 @@ install_dependencies() {
             exit 1
         }
     fi
-
-    if ! command_exists systemctl; then
-        echo -e "${YELLOW}正在安装systemd...${RESET}"
-        apt install -y systemd || {
-            echo -e "${RED}systemd安装失败!${RESET}"
-            exit 1
-        }
-    fi
 }
 
 # 设置虚拟环境（强制模式）
 setup_venv() {
     echo -e "${BLUE}[2/4] 设置虚拟环境...${RESET}"
+    # 彻底清除旧环境
     rm -rf "$VENV_DIR"
+    # 创建新环境
     python3 -m venv "$VENV_DIR" || {
         echo -e "${RED}虚拟环境创建失败!${RESET}"
         exit 1
     }
-    source "$VENV_DIR/bin/activate"
+    # 直接使用绝对路径激活
+    source "$VENV_DIR/bin/activate" || {
+        echo -e "${RED}虚拟环境激活失败!${RESET}"
+        exit 1
+    }
+    # 安装核心依赖
     "$VENV_DIR/bin/pip" install --upgrade pip >/dev/null
     "$VENV_DIR/bin/pip" install web3 eth-account python-dotenv colorama || {
         echo -e "${RED}依赖安装失败!${RESET}"
@@ -101,6 +100,7 @@ setup_config() {
         read -p "请输入钱包私钥: " private_key
         cleaned_key=$(echo "$private_key" | tr -d '[:space:]' | sed 's/^0x//')
         
+        # 使用虚拟环境Python直接验证
         if "$VENV_DIR/bin/python" -c "
 from eth_account import Account
 try:
@@ -119,41 +119,8 @@ except:
             echo -e "${RED}无效私钥! 请检查:${RESET}"
             echo "1. 必须是64字符十六进制"
             echo "2. 不要包含空格"
-            echo "3. 示例: ba4d39b425e17d1c2f78f2a1c0bdaf36c4cf277894801eeec5469169d8124654"
         fi
     done
-}
-
-# 配置系统服务
-setup_systemd_service() {
-    echo -e "${BLUE}[+] 配置系统服务...${RESET}"
-    
-    SERVICE_FILE="/etc/systemd/system/nexus-bot.service"
-    echo "[Unit]
-Description=Nexus UniswapV2 Bot
-After=network.target
-
-[Service]
-User=$(whoami)
-WorkingDirectory=$WORK_DIR
-ExecStart=$VENV_DIR/bin/python $WORK_DIR/main.py
-Environment=PATH=$VENV_DIR/bin:\$PATH
-Restart=always
-RestartSec=30
-
-[Install]
-WantedBy=multi-user.target" | sudo tee $SERVICE_FILE >/dev/null
-
-    sudo systemctl daemon-reload
-    sudo systemctl enable nexus-bot
-    sudo systemctl start nexus-bot
-
-    echo -e "${GREEN}✓ 系统服务已配置并启动${RESET}"
-    echo -e "管理命令:"
-    echo -e " 启动: ${BLUE}sudo systemctl start nexus-bot${RESET}"
-    echo -e " 停止: ${BLUE}sudo systemctl stop nexus-bot${RESET}"
-    echo -e " 状态: ${BLUE}sudo systemctl status nexus-bot${RESET}"
-    echo -e " 日志: ${BLUE}journalctl -u nexus-bot -f${RESET}"
 }
 
 # 主流程
@@ -161,15 +128,15 @@ main() {
     install_dependencies
     setup_venv
     setup_repository
-    install_python_deps
     setup_config
-    setup_systemd_service
     
-    echo -e "\n${GREEN}✅ 安装完成！机器人已作为系统服务自动运行${RESET}"
+    echo -e "\n${GREEN}✅ 安装完成! 运行命令:${RESET}"
+    echo -e "1. 激活环境: ${BLUE}source $VENV_DIR/bin/activate${RESET}"
+    echo -e "2. 启动机器人: ${BLUE}cd $WORK_DIR && python main.py${RESET}"
 }
 
 # 执行
-echo -e "${YELLOW}即将安装 Nexus UniswapV2 机器人（系统服务模式）${RESET}"
+echo -e "${YELLOW}即将安装 Nexus UniswapV2 机器人${RESET}"
 read -p "是否继续? [y/N] " confirm
 case "$confirm" in
     [yY]*) main ;;
