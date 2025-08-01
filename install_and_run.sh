@@ -11,6 +11,7 @@ RESET='\033[0m'
 REPO_URL="https://github.com/figo118/nexus-uniswapv2-bot.git"
 REPO_NAME="nexus-uniswapv2-bot"
 CONFIG_BACKUP="$HOME/.nexus_bot_backup.env"
+VENV_DIR="$HOME/nexus-bot-venv"  # 虚拟环境目录
 
 # 获取脚本目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,11 +37,24 @@ install_dependencies() {
 
     if ! command_exists python3; then
         echo -e "${YELLOW}正在安装Python3...${RESET}"
-        sudo apt install -y python3 python3-pip || {
+        sudo apt install -y python3 python3-pip python3-venv || {
             echo -e "${RED}Python安装失败! 请手动安装后重试。${RESET}"
             exit 1
         }
     fi
+}
+
+# 设置虚拟环境
+setup_venv() {
+    echo -e "${YELLOW}正在设置Python虚拟环境...${RESET}"
+    if [ ! -d "$VENV_DIR" ]; then
+        python3 -m venv "$VENV_DIR" || {
+            echo -e "${RED}虚拟环境创建失败!${RESET}"
+            exit 1
+        }
+    fi
+    # 激活虚拟环境
+    source "$VENV_DIR/bin/activate"
 }
 
 # 克隆或更新仓库
@@ -65,9 +79,19 @@ setup_repository() {
 install_python_deps() {
     echo -e "${BLUE}[3/4] 安装Python依赖...${RESET}"
     cd "$WORK_DIR" || exit
-    pip3 install -r requirements.txt || {
+    
+    # 确保在虚拟环境中
+    if [ -z "$VIRTUAL_ENV" ]; then
+        source "$VENV_DIR/bin/activate"
+    fi
+    
+    pip install --upgrade pip || {
+        echo -e "${YELLOW}pip升级失败，继续安装...${RESET}"
+    }
+    
+    pip install -r requirements.txt || {
         echo -e "${YELLOW}尝试安装核心依赖...${RESET}"
-        pip3 install colorama python-dotenv web3
+        pip install colorama python-dotenv web3
     }
 }
 
@@ -117,6 +141,9 @@ main() {
     # 安装依赖
     install_dependencies
     
+    # 设置虚拟环境
+    setup_venv
+    
     # 设置仓库
     setup_repository
     
@@ -131,7 +158,9 @@ main() {
     
     # 启动
     echo -e "\n${GREEN}✅ 启动 Nexus UniswapV2 机器人...${RESET}"
-    cd "$WORK_DIR" && python3 main.py
+    echo -e "${YELLOW}注意：请确保在虚拟环境中运行！${RESET}"
+    echo -e "激活虚拟环境命令: ${BLUE}source $VENV_DIR/bin/activate${RESET}"
+    echo -e "运行命令: ${BLUE}cd $WORK_DIR && python main.py${RESET}"
 }
 
 # 确认提示
